@@ -67,14 +67,11 @@ export const leaderboardService = {
     if (userError) throw userError;
     if (!user) throw new Error('Anonymous sign-in did not return a player account.');
 
-    const { error } = await supabase
-      .from('bbq_leaderboard')
-      .upsert({
-        player_id: user.id,
-        nickname: nickname.trim(),
-        total_score: score,
-        completed_at: new Date(completedAt).toISOString(),
-      }, { onConflict: 'player_id' });
+    const { error } = await supabase.rpc('submit_bbq_leaderboard_score', {
+      p_nickname: nickname.trim(),
+      p_total_score: score,
+      p_completed_at: new Date(completedAt).toISOString(),
+    });
     if (error) throw error;
 
     return { playerId: user.id };

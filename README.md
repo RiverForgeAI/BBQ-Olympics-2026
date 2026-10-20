@@ -39,9 +39,54 @@ Session nickname and completed event scores persist in this browser's `localStor
 2. Replace `YOUR_SUPABASE_PUBLISHABLE_KEY` with the project's Supabase **publishable** key (it begins with `sb_publishable_`). The project URL is already filled in.
 3. Deploy the static files to GitHub Pages and load the page over HTTPS. The Supabase JavaScript client is loaded from jsDelivr, so browsers need network access to that CDN and to Supabase.
 
-The game signs each browser into Supabase anonymously and reuses the Supabase auth session stored by the client. The authenticated user's UUID is used as `player_id`; each player has one row that is upserted on completion. The board reads up to 30 rows ordered by descending score and then earliest completion time, and refreshes every 10 seconds while the competitor hub is open.
+The game signs each browser into Supabase anonymously and reuses the Supabase auth session stored by the client. The authenticated user's UUID is used as `player_id`; each player has one row, and only a strictly higher score replaces that player's existing best. The board reads up to 30 rows ordered by descending score and then earliest completion time, and refreshes every 10 seconds while the competitor hub is open.
 
-Keep Row Level Security enabled and retain the table policies that limit authenticated inserts and updates to the user's own `player_id`, along with public leaderboard reads. The publishable key is intended for browser use; **never put a secret or service-role key in this static client**. This is a casual event leaderboard, not a cheat-proof scoring system: client-side game results can be manipulated, so do not treat them as authoritative for prizes.
+Keep Row Level Security enabled and retain the table policies that limit authenticated inserts and updates to the user's own `player_id`, along with public leaderboard reads. The score submission function below runs as the caller, obtains `player_id` from `auth.uid()`, and relies on those same table privileges and RLS policies. Run it in the Supabase SQL Editor:
+
+```sql
+CREATE OR REPLACE FUNCTION public.submit_bbq_leaderboard_score(
+  p_nickname text,
+  p_total_score integer,
+  p_completed_at timestamptz
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_player_id uuid := auth.uid();
+BEGIN
+  IF v_player_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
+  END IF;
+  IF p_nickname IS NULL OR btrim(p_nickname) = '' OR char_length(p_nickname) > 16 THEN
+    RAISE EXCEPTION 'Nickname must be 1 to 16 characters' USING ERRCODE = '22023';
+  END IF;
+  IF p_total_score IS NULL OR p_total_score < 0 OR p_total_score > 5000 THEN
+    RAISE EXCEPTION 'Score must be a whole number from 0 to 5000' USING ERRCODE = '22023';
+  END IF;
+  IF p_completed_at IS NULL THEN
+    RAISE EXCEPTION 'Completion time is required' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.bbq_leaderboard AS current_entry
+    (player_id, nickname, total_score, completed_at)
+  VALUES
+    (v_player_id, btrim(p_nickname), p_total_score, p_completed_at)
+  ON CONFLICT (player_id) DO UPDATE
+    SET nickname = EXCLUDED.nickname,
+        total_score = EXCLUDED.total_score,
+        completed_at = EXCLUDED.completed_at
+    WHERE current_entry.total_score < EXCLUDED.total_score;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.submit_bbq_leaderboard_score(text, integer, timestamptz) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.submit_bbq_leaderboard_score(text, integer, timestamptz) TO authenticated;
+```
+
+The conditional `ON CONFLICT` update is atomic: concurrent submissions cannot replace a higher score with a lower or equal one. Equal and lower scores leave the existing row, nickname, and completion time untouched. Keep the table's authenticated INSERT and UPDATE grants and policies in place; the policies must enforce `player_id = auth.uid()` (including UPDATE `USING` and `WITH CHECK`). No secret or service-role key is needed; the publishable key is intended for browser use. This is a casual event leaderboard, not a cheat-proof scoring system: client-side game results can be manipulated, so do not treat them as authoritative for prizes.
 
 ## Test with two phones
 

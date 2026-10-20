@@ -130,6 +130,7 @@ h1, h2, h3, p { margin-top: 0; }
 .leaderboard-section { margin-top: 42px; padding-top: 28px; border-top: 1px solid var(--line); }
 .leaderboard-heading { align-items: center; margin-bottom: 5px; }
 .leaderboard-note { margin: 0 0 16px; color: #8593a0; font-size: 10px; }
+.leaderboard-error { color: #ff9a78; }
 .local-badge { padding: 8px 10px; border: 1px solid rgba(215,255,54,.22); border-radius: 2px; color: #bfcbab; font-size: 8px; }
 .local-badge i { width: 5px; height: 5px; }
 .leaderboard-list { border-top: 1px solid var(--line); }
@@ -281,6 +282,7 @@ h1, h2, h3, p { margin-top: 0; }
 .final-score-list b { color: var(--lime); font: 700 16px var(--font-display); }
 .completion-actions { display: flex; justify-content: center; gap: 9px; }
 .completion-note { margin: 13px 0 0; }
+.completion-screen > #retry-score-submit { margin-top: 10px; }
 .completion-screen > .text-button { margin-top: 8px; }
 .site-footer { min-height: 57px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--line); color: #697784; font-size: 8px; font-weight: 800; letter-spacing: .8px; }
 #confetti-canvas { position: fixed; z-index: 20; inset: 0; width: 100%; height: 100%; pointer-events: none; }

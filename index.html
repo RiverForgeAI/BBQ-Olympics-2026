@@ -42,7 +42,7 @@
                   <input id="nickname" name="nickname" type="text" maxlength="16" autocomplete="nickname" placeholder="Enter a nickname" required>
                   <button class="button button-lime" type="submit">LET'S PLAY <span aria-hidden="true">↗</span></button>
                 </div>
-                <p class="field-note">16 characters max. Your progress stays on this device.</p>
+                <p class="field-note">16 characters max. Your game progress stays on this device.</p>
               </form>
             </div>
             <div class="hero-art" aria-hidden="true">
@@ -73,8 +73,8 @@
           <div class="section-heading dashboard-section-heading"><div><p class="eyebrow">CHOOSE YOUR EVENT</p><h2>The competition</h2></div><span class="event-date">5 EVENTS · 5,000 PTS</span></div>
           <div id="dashboard-challenges" class="challenge-grid"></div>
           <section class="leaderboard-section" aria-labelledby="leaderboard-title">
-            <div class="leaderboard-heading"><div><p class="eyebrow">THE RECORD BOOK</p><h2 id="leaderboard-title">Local leaderboard</h2></div><span class="local-badge"><i></i> THIS DEVICE ONLY</span></div>
-            <p class="leaderboard-note">Scores are saved only in this browser on this device. They are not shared with other players.</p>
+            <div class="leaderboard-heading"><div><p class="eyebrow">THE RECORD BOOK</p><h2 id="leaderboard-title">Shared leaderboard</h2></div><span class="local-badge"><i></i> SHARED BOARD</span></div>
+            <p id="leaderboard-status" class="leaderboard-note" role="status" aria-live="polite">Connecting to the shared leaderboard…</p>
             <div id="leaderboard-list" class="leaderboard-list"></div>
           </section>
         </section>
@@ -91,7 +91,8 @@
           <div class="final-score"><small>FINAL SCORE</small><strong id="final-score">0</strong><span> / 5,000</span></div>
           <div id="final-score-list" class="final-score-list"></div>
           <div class="completion-actions"><button id="play-again" class="button button-lime" type="button">PLAY AGAIN <span aria-hidden="true">↻</span></button><button id="share-result" class="button button-outline" type="button"><span aria-hidden="true">↗</span> SHARE RESULT</button></div>
-          <p class="leaderboard-note completion-note">Your score is on this device's local leaderboard only.</p>
+          <p id="completion-leaderboard-status" class="leaderboard-note completion-note" role="status" aria-live="polite">Submitting your score to the shared leaderboard…</p>
+          <button id="retry-score-submit" class="button button-outline" type="button" hidden>RETRY SCORE SUBMISSION</button>
           <button id="completion-hub" class="text-button" type="button">Back to competitor hub</button>
         </section>
       </main>
@@ -101,7 +102,7 @@
     <canvas id="confetti-canvas" aria-hidden="true"></canvas>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <dialog id="reset-dialog" class="reset-dialog">
-      <form method="dialog"><p class="eyebrow">START FRESH?</p><h2>Reset this session?</h2><p>Your challenge scores and progress will be cleared. Your local leaderboard stays as it is.</p><div class="dialog-actions"><button class="button button-outline" value="cancel">KEEP PLAYING</button><button id="confirm-reset" class="button button-lime" value="reset">RESET SESSION</button></div></form>
+      <form method="dialog"><p class="eyebrow">START FRESH?</p><h2>Reset this session?</h2><p>Your challenge scores and progress will be cleared. Your shared leaderboard entry stays as it is.</p><div class="dialog-actions"><button class="button button-outline" value="cancel">KEEP PLAYING</button><button id="confirm-reset" class="button button-lime" value="reset">RESET SESSION</button></div></form>
     </dialog>
   </body>
 </html>

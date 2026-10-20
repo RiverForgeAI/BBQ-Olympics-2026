@@ -75,9 +75,10 @@ let activeCleanup = () => {};
 let toastTimeout;
 let soundEnabled = true;
 let audioContext;
+let leaderboardLoading = false;
 
 function blankSession(nickname = '') {
-  return { nickname, scores: {}, sessionId: makeId(), leaderboardSaved: false };
+  return { nickname, scores: {}, sessionId: makeId(), leaderboardSubmittedPlayerId: null };
 }
 
 function makeId() {
@@ -93,7 +94,12 @@ function loadSession() {
       const value = saved.scores[challenge.id];
       if (Number.isInteger(value) && value >= 0 && value <= 1000) scores[challenge.id] = value;
     }
-    return { nickname: saved.nickname.slice(0, 16), scores, sessionId: saved.sessionId || makeId(), leaderboardSaved: Boolean(saved.leaderboardSaved) };
+    return {
+      nickname: saved.nickname.slice(0, 16),
+      scores,
+      sessionId: saved.sessionId || makeId(),
+      leaderboardSubmittedPlayerId: saved.leaderboardSubmittedPlayerId || null,
+    };
   } catch {
     return blankSession();
   }
@@ -162,15 +168,27 @@ function startDashboard() {
 
 async function renderLeaderboard() {
   const list = $('#leaderboard-list');
-  const entries = await leaderboardService.getEntries();
-  if (!entries.length) {
-    list.innerHTML = '<p class="empty-leaderboard">No completed scores yet. The first name on the board could be yours.</p>';
-    return;
+  const status = $('#leaderboard-status');
+  if (leaderboardLoading) return;
+  leaderboardLoading = true;
+  try {
+    const entries = await leaderboardService.getEntries();
+    status.textContent = 'Shared leaderboard · refreshes every 10 seconds.';
+    status.classList.remove('leaderboard-error');
+    if (!entries.length) {
+      list.innerHTML = '<p class="empty-leaderboard">No completed scores yet. The first name on the board could be yours.</p>';
+      return;
+    }
+    list.innerHTML = `<div class="leaderboard-row leaderboard-labels"><span>RANK</span><span>COMPETITOR</span><span>SCORE</span><span>DATE</span></div>${entries.map((entry, index) => {
+      const date = new Date(entry.completedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return `<div class="leaderboard-row ${entry.playerId === session.leaderboardSubmittedPlayerId ? 'current-player' : ''}"><span class="leaderboard-rank">${String(index + 1).padStart(2, '0')}</span><span class="leaderboard-player">${escapeHtml(entry.nickname)}</span><strong>${entry.score.toLocaleString()}</strong><time>${date}</time></div>`;
+    }).join('')}`;
+  } catch (error) {
+    status.textContent = `Shared leaderboard unavailable: ${error.message || 'Could not connect to Supabase.'} It will retry automatically.`;
+    status.classList.add('leaderboard-error');
+  } finally {
+    leaderboardLoading = false;
   }
-  list.innerHTML = `<div class="leaderboard-row leaderboard-labels"><span>RANK</span><span>COMPETITOR</span><span>SCORE</span><span>DATE</span></div>${entries.map((entry, index) => {
-    const date = new Date(entry.completedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    return `<div class="leaderboard-row ${entry.sessionId === session.sessionId ? 'current-player' : ''}"><span class="leaderboard-rank">${String(index + 1).padStart(2, '0')}</span><span class="leaderboard-player">${escapeHtml(entry.nickname)}</span><strong>${entry.score.toLocaleString()}</strong><time>${date}</time></div>`;
-  }).join('')}`;
 }
 
 function showToast(message) {
@@ -270,16 +288,35 @@ async function showCompletion() {
   $('#rank-title').textContent = score >= 4500 ? 'LEGEND OF THE GRILL' : score >= 3500 ? 'GOLD MEDAL MATERIAL' : score >= 2500 ? 'PODIUM CONTENDER' : score >= 1500 ? 'RISING COMPETITOR' : 'THE SPIRIT OF THE GAMES';
   showScreen('completion');
   launchConfetti();
-  if (!session.leaderboardSaved) {
-    session.leaderboardSaved = true;
+  if (!session.leaderboardSubmittedPlayerId) await submitCompletionScore();
+  else $('#completion-leaderboard-status').textContent = 'Your score has been submitted to the shared leaderboard.';
+}
+
+async function submitCompletionScore() {
+  const status = $('#completion-leaderboard-status');
+  const retryButton = $('#retry-score-submit');
+  retryButton.hidden = true;
+  retryButton.disabled = true;
+  status.textContent = 'Submitting your score to the shared leaderboard…';
+  status.classList.remove('leaderboard-error');
+
+  try {
+    const result = await leaderboardService.submitEntry({
+      nickname: session.nickname,
+      score: totalScore(),
+      completedAt: Date.now(),
+    });
+    session.leaderboardSubmittedPlayerId = result.playerId;
     saveSession();
-    try {
-      await leaderboardService.submitEntry({ sessionId: session.sessionId, nickname: session.nickname, score, completedAt: Date.now() });
-    } catch {
-      session.leaderboardSaved = false;
-      saveSession();
-      showToast('Score saved for this session, but the local leaderboard could not be updated.');
-    }
+    status.textContent = 'Your score has been submitted to the shared leaderboard.';
+  } catch (error) {
+    const message = error.message || 'Could not submit your score to Supabase.';
+    status.textContent = `Score submission failed: ${message}`;
+    status.classList.add('leaderboard-error');
+    retryButton.hidden = false;
+    showToast(`Score submission failed: ${message}`);
+  } finally {
+    retryButton.disabled = false;
   }
 }
 
@@ -750,6 +787,7 @@ function boot() {
     startDashboard();
   });
   $('#completion-hub').addEventListener('click', startDashboard);
+  $('#retry-score-submit').addEventListener('click', () => void submitCompletionScore());
   $('#share-result').addEventListener('click', () => void shareResult());
   $('#sound-toggle').addEventListener('click', (event) => {
     soundEnabled = !soundEnabled;
@@ -765,6 +803,9 @@ function boot() {
       startDashboard();
     }
   });
+  window.setInterval(() => {
+    if (!screens.dashboard.hidden) void renderLeaderboard();
+  }, 10_000);
 }
 
 boot();
